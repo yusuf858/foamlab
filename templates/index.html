@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>FoamLab — Lake Pollution Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0a0e14;
+  --surface:#111720;
+  --surface2:#182030;
+  --border:#1e2d42;
+  --border2:#2a3f5a;
+  --accent:#00b4d8;
+  --accent2:#0077a8;
+  --foam:#ff5050;
+  --oil:#ffa500;
+  --reflect:#50a0ff;
+  --clean:#50c850;
+  --ink:#e8f0fe;
+  --ink2:#8ba4c0;
+  --ink3:#4a6a8a;
+  --warn:#e67e22;
+  --crit:#e74c3c;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;font-size:14px}
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:100}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:6px;display:grid;place-items:center;font-family:var(--mono);font-weight:600;font-size:13px;color:#000;flex-shrink:0}
+.logo-text{font-family:var(--mono);font-weight:600;font-size:1rem;letter-spacing:.05em}
+.logo-sub{font-size:.68rem;color:var(--ink3);font-family:var(--mono);margin-top:1px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:1rem}
+.db-dot{width:8px;height:8px;border-radius:50%;background:var(--ink3);display:inline-block;margin-right:.35rem;transition:background .3s}
+.db-dot.on{background:var(--clean)}
+.db-label{font-size:.7rem;font-family:var(--mono);color:var(--ink3)}
+
+/* ── Nav ── */
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;gap:0;overflow-x:auto}
+.nav-tab{padding:.6rem 1.1rem;font-size:.75rem;font-family:var(--mono);color:var(--ink3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;display:flex;align-items:center;gap:.4rem}
+.nav-tab:hover{color:var(--ink)}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.nav-tab svg{width:13px;height:13px;flex-shrink:0}
+
+/* ── Layout ── */
+main{max-width:1400px;margin:0 auto;padding:1.25rem 1.5rem}
+.two-col{display:grid;grid-template-columns:360px 1fr;gap:1.25rem;align-items:start}@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem}
+.card-hd{font-family:var(--mono);font-size:.65rem;font-weight:600;letter-spacing:.12em;color:var(--ink3);text-transform:uppercase;margin-bottom:.75rem}
+.card-hd span{color:var(--accent)}
+
+/* ── Upload zone ── */
+.upload-zone{border:1px dashed var(--border2);border-radius:6px;padding:1.5rem 1rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;min-height:80px}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(0,180,216,.04)}
+.upload-zone input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;font-size:0}
+.upload-icon{font-size:1.6rem;margin-bottom:.4rem;opacity:.4}
+.upload-title{font-size:.8rem;color:var(--ink2)}
+.upload-sub{font-size:.68rem;color:var(--ink3);margin-top:.2rem}
+.thumb-wrap{margin-top:.6rem;pointer-events:none;position:relative;z-index:1}
+.thumb-wrap img{max-width:100%;max-height:160px;border-radius:4px;border:1px solid var(--border2);object-fit:contain;pointer-events:none}
+
+/* ── Controls ── */
+.field-group{margin-bottom:.75rem}
+.field-label{display:block;font-size:.68rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.35rem;letter-spacing:.06em}
+.seg-btns{display:flex;gap:.3rem;flex-wrap:wrap}
+.seg-btn{padding:.28rem .65rem;font-size:.7rem;font-family:var(--mono);border-radius:4px;border:1px solid var(--border2);background:var(--surface2);color:var(--ink2);cursor:pointer;transition:all .15s}
+.seg-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.slider-row{display:flex;align-items:center;gap:.5rem}
+input[type=range]{flex:1;accent-color:var(--accent);height:3px}
+.slider-val{font-family:var(--mono);font-size:.72rem;color:var(--accent);min-width:24px}
+.field-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:.4rem .6rem;font-size:.78rem;color:var(--ink);font-family:var(--sans);outline:none}
+.field-input:focus{border-color:var(--accent)}
+select.field-input option{background:var(--surface2)}
+
+/* ── Buttons ── */
+.btn{padding:.5rem 1rem;border-radius:5px;font-size:.78rem;font-family:var(--mono);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn-primary{background:var(--accent);color:#000;font-weight:600}
+.btn-primary:hover{background:#00c9f0}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--ink2)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.btn-sm{padding:.3rem .7rem;font-size:.7rem}
+
+/* ── Severity badge ── */
+.badge{padding:.2rem .55rem;border-radius:3px;font-size:.65rem;font-family:var(--mono);font-weight:600;letter-spacing:.06em}
+.badge-critical{background:rgba(231,76,60,.15);color:var(--crit);border:1px solid rgba(231,76,60,.3)}
+.badge-moderate{background:rgba(230,126,34,.15);color:var(--warn);border:1px solid rgba(230,126,34,.3)}
+.badge-low{background:rgba(0,180,216,.15);color:var(--accent);border:1px solid rgba(0,180,216,.3)}
+.badge-clean{background:rgba(80,200,80,.15);color:var(--clean);border:1px solid rgba(80,200,80,.3)}
+
+/* ── Result summary ── */
+.result-card{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:1rem;margin-bottom:1rem}
+.result-severity{font-family:var(--mono);font-size:1.6rem;font-weight:600;margin:.3rem 0}
+.result-severity.Critical{color:var(--crit)}
+.result-severity.Moderate{color:var(--warn)}
+.result-severity.Low{color:var(--accent)}
+.result-severity.Clean{color:var(--clean)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.75rem}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:.5rem .65rem}
+.stat-val{font-family:var(--mono);font-size:1.1rem;font-weight:600;color:var(--accent)}
+.stat-lbl{font-size:.62rem;color:var(--ink3);margin-top:.1rem;font-family:var(--mono)}
+
+/* ── Pipeline images ── */
+.pipe-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-top:.75rem}
+.pipe-card{background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:zoom-in;transition:border-color .15s}
+.pipe-card:hover{border-color:var(--accent)}
+.pipe-img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.pipe-lbl{font-size:.58rem;font-family:var(--mono);color:var(--ink3);padding:.25rem .4rem;background:var(--surface)}
+.pipe-num{display:inline-block;background:var(--accent);color:#000;font-size:.55rem;font-family:var(--mono);font-weight:600;padding:.05rem .3rem;border-radius:2px;margin-right:.25rem}
+
+/* ── Region table ── */
+.data-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.data-table th{background:var(--surface2);color:var(--ink3);font-family:var(--mono);font-size:.6rem;font-weight:600;padding:.4rem .6rem;border-bottom:1px solid var(--border);text-align:left;letter-spacing:.06em}
+.data-table td{padding:.38rem .6rem;border-bottom:1px solid var(--border);color:var(--ink2)}
+.data-table tr:hover td{background:var(--surface2)}
+.label-pill{padding:.1rem .4rem;border-radius:3px;font-size:.6rem;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.label-foam{background:rgba(255,80,80,.15);color:var(--foam)}
+.label-oil{background:rgba(255,165,0,.15);color:var(--oil)}
+.label-reflect{background:rgba(80,160,255,.15);color:var(--reflect)}
+.label-clean{background:rgba(80,200,80,.15);color:var(--clean)}
+.label-debris{background:rgba(32,200,200,.15);color:#20c8c8}
+
+/* ── Visualised output ── */
+.vis-wrap{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border2);background:var(--surface2)}
+.vis-img{width:100%;display:block;cursor:zoom-in}
+.vis-overlay{position:absolute;top:.5rem;right:.5rem;display:flex;flex-direction:column;gap:.3rem}
+
+/* ── Comparison / ablation table ── */
+.cmp-grid{display:grid;gap:.75rem}
+.cmp-row{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.75rem;display:grid;grid-template-columns:auto 1fr auto;gap:.75rem;align-items:center}
+.cmp-thumb{width:90px;height:68px;object-fit:cover;border-radius:4px;border:1px solid var(--border)}
+.cmp-label{font-family:var(--mono);font-size:.75rem;font-weight:600;color:var(--ink);margin-bottom:.2rem}
+.cmp-meta{font-size:.65rem;color:var(--ink3);font-family:var(--mono)}
+.cmp-stats{text-align:right}
+
+/* ── Robustness ── */
+.rob-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem}
+.rob-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.rob-thumb{width:100%;height:110px;object-fit:cover;display:block}
+.rob-body{padding:.5rem .65rem}
+.rob-name{font-family:var(--mono);font-size:.68rem;font-weight:600;color:var(--ink);margin-bottom:.25rem}
+.rob-stat{font-size:.62rem;color:var(--ink3);font-family:var(--mono)}
+.stability-Stable{color:var(--clean)}
+.stability-Moderate{color:var(--warn)}
+.stability-Unstable{color:var(--crit)}
+
+/* ── History ── */
+.history-wrap{overflow-x:auto}
+.h-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1rem}
+
+/* ── Webcam ── */
+#wc-video{width:100%;max-width:480px;border-radius:6px;border:1px solid var(--border2);background:#000;display:block}
+
+/* ── Interactive view ── */
+.iv-tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.6rem}
+.iv-tab{padding:.25rem .6rem;font-size:.68rem;font-family:var(--mono);border-radius:4px;border:1px solid var(--border2);background:var(--surface2);color:var(--ink3);cursor:pointer;transition:all .15s}
+.iv-tab.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.iv-img{width:100%;border-radius:5px;border:1px solid var(--border2);cursor:zoom-in;display:block}
+
+/* ── Progress ── */
+.prog-wrap{display:none;margin-top:.5rem}
+.prog-track{background:var(--border);border-radius:2px;height:3px;overflow:hidden}
+.prog-fill{background:var(--accent);height:100%;width:0%;transition:width .3s}
+.prog-txt{font-size:.65rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.2rem}
+
+/* ── Alert ── */
+.alert{display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:4px;font-size:.75rem;font-family:var(--mono)}
+.alert.error{background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);color:var(--crit)}
+.alert.success{background:rgba(80,200,80,.1);border:1px solid rgba(80,200,80,.3);color:var(--clean)}
+.alert.info{background:rgba(0,180,216,.1);border:1px solid rgba(0,180,216,.3);color:var(--accent)}
+
+/* ── Toast ── */
+#toast-wrap{position:fixed;bottom:1.2rem;right:1.2rem;display:flex;flex-direction:column;gap:.4rem;z-index:9000}
+.toast{padding:.5rem .9rem;border-radius:5px;font-size:.73rem;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border2);color:var(--ink);animation:slideIn .2s ease;pointer-events:none}
+.toast.error{border-color:rgba(231,76,60,.5);color:var(--crit)}
+.toast.success{border-color:rgba(80,200,80,.5);color:var(--clean)}
+.toast.info{border-color:rgba(0,180,216,.5);color:var(--accent)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Modal ── */
+#img-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:1rem;cursor:zoom-out}
+#img-modal.open{display:flex}
+.modal-inner{max-width:92vw;max-height:92vh;position:relative}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.modal-title{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}
+.modal-ctrl{display:flex;gap:.35rem}
+.modal-btn{padding:.25rem .55rem;font-size:.7rem;font-family:var(--mono);background:rgba(255,255,255,.08);border:none;color:var(--ink);border-radius:4px;cursor:pointer}
+.modal-btn:hover{background:rgba(255,255,255,.15)}
+#modal-img{max-width:88vw;max-height:84vh;border-radius:6px;transform-origin:top left;transition:transform .2s;display:block}
+
+/* ── Section titles ── */
+.sec-title{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase;margin:.9rem 0 .6rem;display:flex;align-items:center;gap:.5rem}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Loader ── */
+#loader{display:none;position:fixed;inset:0;background:rgba(10,14,20,.8);z-index:8888;flex-direction:column;align-items:center;justify-content:center;gap:.75rem}
+#loader.on{display:flex}
+.loader-spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-txt{font-family:var(--mono);font-size:.75rem;color:var(--ink3)}
+
+/* ── Doughnut legend ── */
+.legend-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+.legend-item{display:flex;align-items:center;gap:.3rem;font-size:.65rem;font-family:var(--mono);color:var(--ink3)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo-mark">FL</div>
+  <div>
+    <div class="logo-text">FoamLab</div>
+    <div class="logo-sub">Lake Surface Pollution Detection System</div>
+  </div>
+  <div class="header-right">
+    <span title="Click to configure DB" style="cursor:pointer;display:flex;align-items:center;gap:.4rem" onclick="toggleDBPanel()">
+      <span class="db-dot" id="db-dot"></span>
+      <span class="db-label" id="db-label">Checking DB…</span>
+      <span style="font-size:.6rem;color:var(--ink3);font-family:var(--mono)">⚙</span>
+    </span>
+  </div>
+  <!-- DB Config Panel -->
+  <div id="db-panel" style="display:none;position:fixed;top:52px;right:1rem;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:1rem;z-index:500;width:300px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div style="font-family:var(--mono);font-size:.68rem;font-weight:600;color:var(--accent);margin-bottom:.75rem;letter-spacing:.1em">DATABASE CONFIG</div>
+    <div style="display:flex;flex-direction:column;gap:.45rem">
+      <div>
+        <div style="font-size:.6rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.2rem">HOST</div>
+        <input id="cfg-host" class="field-input" placeholder="localhost" value="localhost">
+      </div>
+      <div>
+        <div style="font-size:.6rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.2rem">USER</div>
+        <input id="cfg-user" class="field-input" placeholder="root" value="root">
+      </div>
+      <div>
+        <div style="font-size:.6rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.2rem">PASSWORD</div>
+        <input id="cfg-pass" class="field-input" type="password" placeholder="Leave blank if no password">
+      </div>
+      <div>
+        <div style="font-size:.6rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.2rem">DATABASE NAME</div>
+        <input id="cfg-name" class="field-input" placeholder="foamlab_db" value="foamlab_db">
+      </div>
+    </div>
+    <div style="display:flex;gap:.4rem;margin-top:.75rem">
+      <button class="btn btn-primary btn-sm" onclick="saveDBConfig()" style="flex:1">&#9654; Connect</button>
+      <button class="btn btn-outline btn-sm" onclick="testDBConfig()">Test</button>
+      <button class="btn btn-outline btn-sm" onclick="toggleDBPanel()">&#x2715;</button>
+    </div>
+    <div id="db-cfg-msg" style="font-size:.65rem;font-family:var(--mono);margin-top:.5rem;padding:.4rem .5rem;border-radius:4px;display:none;word-break:break-all;line-height:1.4"></div>
+    <div style="font-size:.58rem;color:var(--ink3);font-family:var(--mono);margin-top:.5rem;line-height:1.5">
+      Tip: If offline, ensure MySQL service is running.<br>
+      Windows: <span style="color:var(--accent)">net start MySQL80</span> (as Admin)
+    </div>
+  </div>
+</header>
+
+<!-- ── NAV ── -->
+<nav>
+  <button class="nav-tab active" onclick="switchTab('analyse')" data-tab="analyse">
+    <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.5"/></svg>
+    Analyse
+  </button>
+  <button class="nav-tab" onclick="switchTab('batch')" data-tab="batch">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+    Batch
+  </button>
+  <button class="nav-tab" onclick="switchTab('webcam')" data-tab="webcam">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="10" height="8" rx="1.5"/><path d="M11 7l4-2v6l-4-2"/></svg>
+    Webcam
+  </button>
+  <button class="nav-tab" onclick="switchTab('algorithm')" data-tab="algorithm">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
+    Algorithm Study
+  </button>
+  <button class="nav-tab" onclick="switchTab('robustness')" data-tab="robustness">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l1.5 3.5L13 6l-2.5 2.5.5 3.5L8 10.5 5 12l.5-3.5L3 6l3.5-.5z"/></svg>
+    Robustness
+  </button>
+  <button class="nav-tab" onclick="switchTab('comparative')" data-tab="comparative">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="10" width="4" height="5" rx="1"/><rect x="6" y="6" width="4" height="9" rx="1"/><rect x="11" y="2" width="4" height="13" rx="1"/></svg>
+    Comparative
+  </button>
+  <button class="nav-tab" onclick="switchTab('history')" data-tab="history">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+    History
+  </button>
+</nav>
+
+<!-- ── LOADER ── -->
+<div id="loader"><div class="loader-spinner"></div><div class="loader-txt" id="loader-txt">Processing…</div></div>
+
+<!-- ── TOAST ── -->
+<div id="toast-wrap"></div>
+
+<!-- ── IMAGE MODAL ── -->
+<div id="img-modal" onclick="closeModal()">
+  <div class="modal-inner" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <span class="modal-title" id="modal-title"></span>
+      <div class="modal-ctrl">
+        <button class="modal-btn" onclick="mzoom(0.25)">＋</button>
+        <button class="modal-btn" onclick="mzoom(-0.25)">－</button>
+        <button class="modal-btn" onclick="mzreset()">1:1</button>
+        <button class="modal-btn" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <img id="modal-img" src="" alt="">
+  </div>
+</div>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 1 — ANALYSE
+════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-analyse">
+  <div class="two-col">
+
+    <!-- LEFT PANEL -->
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="card">
+        <div class="card-hd">Lake Surface Image</div>
+        <div class="upload-zone" id="main-drop">
+          <input type="file" id="main-file" accept="image/*">
+          <div id="main-upload-prompt">
+            <div class="upload-icon">🌊</div>
+            <div class="upload-title">Click or drop lake image here</div>
+            <div class="upload-sub">PNG, JPG, BMP up to 30MB</div>
+          </div>
+          <div class="thumb-wrap" id="main-thumb" style="display:none">
+            <img id="main-preview" src="" alt="preview" style="pointer-events:none">
+            <div style="font-size:.65rem;color:var(--ink3);margin-top:.3rem;font-family:var(--mono)">Click to change image</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">Pipeline <span>Parameters</span></div>
+
+        <div class="field-group">
+          <label class="field-label">Filter Method</label>
+          <div class="seg-btns" id="filter-btns">
+            <button class="seg-btn active" data-val="gaussian" onclick="setParam('filter',this)">Gaussian</button>
+            <button class="seg-btn" data-val="median" onclick="setParam('filter',this)">Median</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Enhancement</label>
+          <div class="seg-btns" id="enhance-btns">
+            <button class="seg-btn active" data-val="clahe" onclick="setParam('enhance',this)">CLAHE</button>
+            <button class="seg-btn" data-val="histogram" onclick="setParam('enhance',this)">Hist EQ</button>
+            <button class="seg-btn" data-val="homomorphic" onclick="setParam('enhance',this)">Homomorphic</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Segmentation</label>
+          <div class="seg-btns" id="seg-btns">
+            <button class="seg-btn active" data-val="otsu" onclick="setParam('seg',this)">Otsu</button>
+            <button class="seg-btn" data-val="adaptive" onclick="setParam('seg',this)">Adaptive</button>
+            <button class="seg-btn" data-val="canny" onclick="setParam('seg',this)">Canny</button>
+            <button class="seg-btn" data-val="color" onclick="setParam('seg',this)">Color Range</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Structuring Element</label>
+          <div class="seg-btns" id="se-btns">
+            <button class="seg-btn active" data-val="ellipse" onclick="setParam('se',this)">Ellipse</button>
+            <button class="seg-btn" data-val="rect" onclick="setParam('se',this)">Rect</button>
+            <button class="seg-btn" data-val="cross" onclick="setParam('se',this)">Cross</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">SE Size <span class="slider-val" id="se-val">9</span></label>
+          <input type="range" id="se-size" min="3" max="21" step="2" value="9"
+                 oninput="document.getElementById('se-val').textContent=this.value">
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Sample Location</label>
+          <input class="field-input" type="text" id="location-in" placeholder="e.g. Tungabhadra Lake, Sector 3">
+        </div>
+
+        <div id="analyse-prog" class="prog-wrap">
+          <div class="prog-txt" id="analyse-prog-txt">Running pipeline…</div>
+          <div class="prog-track"><div class="prog-fill" id="analyse-prog-fill"></div></div>
+        </div>
+        <div class="alert" id="analyse-alert"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="runAnalyse()">▶ Detect Pollution</button>
+          <button class="btn btn-outline btn-sm" onclick="clearAnalyse()">Clear</button>
+          <a href="/api/generate_pdf" target="_blank" class="btn btn-outline btn-sm">⬇ PDF Report</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      <div id="result-main" style="display:none">
+        <div class="result-card">
+          <div class="card-hd">Detection Result</div>
+          <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+            <div>
+              <div style="font-size:.7rem;font-family:var(--mono);color:var(--ink3)">SEVERITY</div>
+              <div class="result-severity" id="res-severity">—</div>
+              <div id="res-dominant" style="font-size:.78rem;color:var(--ink2);margin-top:.2rem"></div>
+              <div id="res-method-badge" style="margin-top:.35rem"></div>
+            </div>
+            <div class="stat-grid" style="flex:1;min-width:240px">
+              <div class="stat-box"><div class="stat-val" id="rs-pct">—</div><div class="stat-lbl">Pollution %</div></div>
+              <div class="stat-box"><div class="stat-val" id="rs-regions">—</div><div class="stat-lbl">Regions</div></div>
+              <div class="stat-box"><div class="stat-val" id="rs-time">—</div><div class="stat-lbl">Time (s)</div></div>
+            </div>
+          </div>
+          <!-- Label distribution chart -->
+          <div style="margin-top:.75rem">
+            <div style="font-size:.65rem;font-family:var(--mono);color:var(--ink3);margin-bottom:.4rem;letter-spacing:.08em">LABEL DISTRIBUTION</div>
+            <div style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap">
+              <div style="position:relative;width:130px;height:130px;flex-shrink:0">
+                <canvas id="label-chart" style="width:130px!important;height:130px!important;display:block"></canvas>
+              </div>
+              <div id="label-legend" style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:.45rem"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visualised output -->
+        <div class="sec-title">Visualised Output</div>
+        <div class="vis-wrap">
+          <img class="vis-img" id="vis-img" src="" alt="visualised" onclick="openModal(this.src,'Visualised Output')">
+          <div class="vis-overlay">
+            <button class="modal-btn" onclick="openModal(document.getElementById('vis-img').src,'Visualised Output')">⛶ Expand</button>
+          </div>
+        </div>
+
+        <!-- Interactive pipeline view -->
+        <div class="sec-title">Interactive Pipeline View</div>
+        <div class="card">
+          <div class="iv-tabs" id="iv-tabs"></div>
+          <img class="iv-img" id="iv-img" src="" alt="" onclick="openModal(this.src,document.querySelector('.iv-tab.active')?.textContent||'')">
+        </div>
+
+        <!-- Pipeline grid -->
+        <div class="sec-title">Pipeline Thumbnail Grid</div>
+        <div class="pipe-grid" id="pipe-grid"></div>
+
+        <!-- Region table -->
+        <div class="sec-title">Detected Regions — Feature Table</div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table class="data-table" id="region-table">
+              <thead><tr>
+                <th>#</th><th>Label</th><th>Area (px²)</th><th>Perimeter</th>
+                <th>Circularity</th><th>Compactness</th><th>Aspect Ratio</th>
+                <th>Solidity</th><th>% Image</th>
+              </tr></thead>
+              <tbody id="region-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div id="empty-state" style="text-align:center;padding:3rem 1rem;color:var(--ink3)">
+        <div style="font-size:2.5rem;margin-bottom:.75rem;opacity:.3">🌊</div>
+        <div style="font-family:var(--mono);font-size:.8rem">Upload a lake surface image to begin detection</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 2 — BATCH
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-batch">
+  <div class="card" style="max-width:700px;margin-bottom:1rem">
+    <div class="card-hd">Batch Upload</div>
+    <div class="upload-zone" id="batch-drop">
+      <input type="file" id="batch-files" accept="image/*" multiple>
+      <div class="upload-icon">📁</div>
+      <div class="upload-title">Click or drop multiple lake images here</div>
+      <div class="upload-sub" id="batch-file-count">No files selected</div>
+    </div>
+    <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:.75rem">
+      <div>
+        <label class="field-label">SE Size <span class="slider-val" id="batch-se-val">9</span></label>
+        <input type="range" id="batch-se-size" min="3" max="21" step="2" value="9"
+               oninput="document.getElementById('batch-se-val').textContent=this.value" style="width:150px">
+      </div>
+      <button class="btn btn-primary" onclick="runBatch()">▶ Run Batch Analysis</button>
+    </div>
+    <div id="batch-prog" class="prog-wrap">
+      <div class="prog-txt">Processing images…</div>
+      <div class="prog-track"><div class="prog-fill" id="batch-prog-fill"></div></div>
+    </div>
+  </div>
+  <div id="batch-results" style="display:none">
+    <div class="h-stats" id="batch-stats"></div>
+    <div id="batch-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 3 — WEBCAM
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-webcam">
+  <div style="display:flex;gap:1.25rem;flex-wrap:wrap;align-items:flex-start">
+    <div>
+      <video id="wc-video" autoplay muted playsinline></video>
+      <canvas id="wc-canvas" style="display:none"></canvas>
+      <div class="btn-row" style="margin-top:.6rem">
+        <button class="btn btn-primary" onclick="startWC()">Start Camera</button>
+        <button class="btn btn-outline" onclick="captureWC()" id="wc-capture" disabled>Capture & Analyse</button>
+        <button class="btn btn-outline btn-sm" onclick="stopWC()">Stop</button>
+      </div>
+    </div>
+    <div id="wc-result" style="display:none;min-width:260px">
+      <div class="result-card">
+        <div class="card-hd">Live Detection</div>
+        <div class="result-severity" id="wc-severity">—</div>
+        <div style="font-size:.75rem;color:var(--ink2);margin-top:.25rem" id="wc-dominant">—</div>
+        <div class="stat-grid" style="margin-top:.5rem">
+          <div class="stat-box"><div class="stat-val" id="wc-pct">—</div><div class="stat-lbl">Poll %</div></div>
+          <div class="stat-box"><div class="stat-val" id="wc-regions">—</div><div class="stat-lbl">Regions</div></div>
+        </div>
+        <img id="wc-vis" style="width:100%;border-radius:5px;margin-top:.5rem;border:1px solid var(--border2)" src="" alt="">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 4 — ALGORITHM COMBINATION STUDY
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-algorithm">
+  <div class="card" style="max-width:560px;margin-bottom:1rem">
+    <div class="card-hd">Algorithm <span>Combination Study</span></div>
+    <p style="font-size:.75rem;color:var(--ink3);margin-bottom:.75rem;font-family:var(--mono)">
+      Tests 7 pipeline combinations (Filter + Enhancement + Segmentation) on your image and compares results.
+    </p>
+    <div class="upload-zone" id="algo-drop">
+      <input type="file" id="algo-file" accept="image/*">
+      <div class="upload-title">Click or drop lake image for comparison</div>
+      <div class="upload-sub" id="algo-file-name">No file selected</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="runAlgoStudy()">▶ Run Combination Study</button>
+    </div>
+  </div>
+  <div id="algo-results" style="display:none">
+    <div class="sec-title">Comparison Results</div>
+    <div class="cmp-grid" id="algo-list"></div>
+    <div class="sec-title" style="margin-top:1rem">Best Pipeline</div>
+    <div class="card" id="algo-best" style="background:rgba(0,180,216,.06);border-color:rgba(0,180,216,.3)"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 5 — ROBUSTNESS TESTING
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-robustness">
+  <div class="card" style="max-width:560px;margin-bottom:1rem">
+    <div class="card-hd">Robustness <span>Testing</span></div>
+    <p style="font-size:.75rem;color:var(--ink3);margin-bottom:.75rem;font-family:var(--mono)">
+      Tests system under: Gaussian Noise, Salt & Pepper, Rotation, Scaling, Brightness, JPEG Compression.
+    </p>
+    <div class="upload-zone" id="rob-drop">
+      <input type="file" id="rob-file" accept="image/*">
+      <div class="upload-title">Click or drop lake image for robustness test</div>
+      <div class="upload-sub" id="rob-file-name">No file selected</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="runRobustness()">▶ Run Robustness Test</button>
+    </div>
+  </div>
+  <div id="rob-results" style="display:none">
+    <div class="sec-title">Results per Variant</div>
+    <div class="rob-grid" id="rob-grid"></div>
+    <div class="sec-title" style="margin-top:1rem">Summary Table</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table class="data-table" id="rob-table">
+          <thead><tr>
+            <th>Variant</th><th>Regions</th><th>Pollution %</th>
+            <th>Severity</th><th>Drift</th><th>Stability</th><th>Time (s)</th>
+          </tr></thead>
+          <tbody id="rob-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 6 — COMPARATIVE ANALYSIS
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-comparative">
+  <div class="card" style="max-width:560px;margin-bottom:1rem">
+    <div class="card-hd">Comparative <span>Analysis</span></div>
+    <p style="font-size:.75rem;color:var(--ink3);margin-bottom:.75rem;font-family:var(--mono)">
+      Compares Basic (Assignment-1) vs Enhanced (Assignment-1+2) vs Full Integrated (Assignment-3).
+    </p>
+    <div class="upload-zone" id="cmp-drop">
+      <input type="file" id="cmp-file" accept="image/*">
+      <div class="upload-title">Click or drop lake image for comparison</div>
+      <div class="upload-sub" id="cmp-file-name">No file selected</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="runComparative()">▶ Run Comparative Analysis</button>
+    </div>
+  </div>
+  <div id="cmp-results" style="display:none">
+    <div class="sec-title">System Comparison</div>
+    <div id="cmp-list" style="display:flex;flex-direction:column;gap:.75rem"></div>
+    <div class="sec-title" style="margin-top:1rem">Summary Table</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table class="data-table" id="cmp-table">
+          <thead><tr>
+            <th>System</th><th>Techniques</th><th>Regions</th>
+            <th>Pollution %</th><th>Noise Robustness</th><th>Time (s)</th>
+          </tr></thead>
+          <tbody id="cmp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:.75rem">
+      <canvas id="cmp-chart" height="120"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 7 — HISTORY
+════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-history">
+  <div class="h-stats">
+    <div class="stat-box"><div class="stat-val" id="h-total">0</div><div class="stat-lbl">Total Analyses</div></div>
+    <div class="stat-box"><div class="stat-val" id="h-avgpoll">—</div><div class="stat-lbl">Avg Pollution %</div></div>
+    <div class="stat-box"><div class="stat-val" id="h-critical">0</div><div class="stat-lbl">Critical Events</div></div>
+    <div class="stat-box"><div class="stat-val" id="h-clean">0</div><div class="stat-lbl">Clean Results</div></div>
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-hd">Pollution Trend</div>
+    <canvas id="trend-chart" height="100"></canvas>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;border-bottom:1px solid var(--border)">
+      <span class="card-hd" style="margin:0">Analysis History</span>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>ID</th><th>File</th><th>Filter</th><th>Enhance</th>
+          <th>Segment</th><th>Severity</th><th>Dominant</th>
+          <th>Regions</th><th>Poll%</th><th>Location</th><th>Time</th>
+        </tr></thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </div>
+    <div id="pager" style="padding:.5rem 1rem;display:flex;gap:.3rem;flex-wrap:wrap;align-items:center"></div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const S = {
+  filter:'gaussian', enhance:'clahe', seg:'otsu', se:'ellipse',
+  currentImages:{}, sessionHistory:[], allHistory:[],
+  histPage:1, histPP:15,
+  labelChart: null, cmpChart: null, trendChart: null,
+};
+
+// ─── TAB SWITCHING ───────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+  if (id==='history') loadHistory();
+}
+
+// ─── PARAM SETTERS ───────────────────────────────────────────────────────────
+function setParam(type, btn) {
+  const groups = {filter:'filter-btns', enhance:'enhance-btns', seg:'seg-btns', se:'se-btns'};
+  document.querySelectorAll('#'+groups[type]+' .seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  S[type] = btn.dataset.val;
+}
+
+// ─── LOADER / TOAST ───────────────────────────────────────────────────────────
+function showLoader(msg='Processing…'){
+  document.getElementById('loader-txt').textContent=msg;
+  document.getElementById('loader').classList.add('on');
+}
+function hideLoader(){document.getElementById('loader').classList.remove('on');}
+function toast(msg, type='success'){
+  const w=document.getElementById('toast-wrap');
+  const d=document.createElement('div');
+  d.className='toast '+(type||'');
+  d.textContent=msg;
+  w.appendChild(d);
+  setTimeout(()=>d.remove(), 3000);
+}
+function showAlert(id,msg,type){
+  const el=document.getElementById(id);
+  el.className='alert '+type;
+  el.textContent=msg;
+  el.style.display='block';
+}
+function hideAlert(id){document.getElementById(id).style.display='none';}
+
+// ─── PROGRESS BAR ─────────────────────────────────────────────────────────────
+function animProg(fillId, wrapId, duration){
+  document.getElementById(wrapId).style.display='block';
+  const fill=document.getElementById(fillId);
+  fill.style.width='0%';
+  let pct=0;
+  const iv=setInterval(()=>{
+    pct=Math.min(pct+100/(duration/100),90);
+    fill.style.width=pct+'%';
+  },100);
+  return {done:()=>{clearInterval(iv);fill.style.width='100%';setTimeout(()=>document.getElementById(wrapId).style.display='none',400);}};
+}
+
+// ─── DB STATUS ───────────────────────────────────────────────────────────────
+function toggleDBPanel(){
+  const p=document.getElementById('db-panel');
+  p.style.display=p.style.display==='none'?'block':'none';
+}
+
+function _dbCfgMsg(txt, color){
+  const msg=document.getElementById('db-cfg-msg');
+  msg.style.display='block';
+  msg.style.background=color==='green'?'rgba(80,200,80,.08)':color==='red'?'rgba(231,76,60,.08)':'rgba(0,180,216,.08)';
+  msg.style.color=color==='green'?'var(--clean)':color==='red'?'var(--crit)':'var(--accent)';
+  msg.style.border='1px solid '+(color==='green'?'rgba(80,200,80,.2)':color==='red'?'rgba(231,76,60,.2)':'rgba(0,180,216,.2)');
+  msg.textContent=txt;
+}
+
+async function testDBConfig(){
+  _dbCfgMsg('Testing connection…','blue');
+  try{
+    const r=await fetch('/api/db_test');
+    const d=await r.json();
+    if(d.connected){
+      _dbCfgMsg('Connection OK! Database reachable.','green');
+    } else if(d.server_reachable===false){
+      _dbCfgMsg('Cannot reach MySQL server. Is it running? Error: '+(d.error||'unknown'),'red');
+    } else {
+      _dbCfgMsg('Server OK, DB issue: '+(d.error||d.status),'red');
+    }
+  }catch(e){_dbCfgMsg('Test error: '+e.message,'red');}
+}
+
+async function saveDBConfig(){
+  const cfg={
+    host: document.getElementById('cfg-host').value.trim()||'localhost',
+    user: document.getElementById('cfg-user').value.trim()||'root',
+    pass: document.getElementById('cfg-pass').value,
+    name: document.getElementById('cfg-name').value.trim()||'foamlab_db',
+  };
+  _dbCfgMsg('Connecting…','blue');
+  try{
+    const r=await fetch('/api/db_config',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(cfg)
+    });
+    const d=await r.json();
+    if(d.connected){
+      _dbCfgMsg('Connected successfully!','green');
+      document.getElementById('db-dot').className='db-dot on';
+      document.getElementById('db-label').textContent='DB Connected';
+      toast('Database connected!','success');
+      setTimeout(()=>toggleDBPanel(),1200);
+    } else {
+      _dbCfgMsg('Failed: '+(d.error||'Check credentials and MySQL service'),'red');
+    }
+  }catch(e){_dbCfgMsg('Network error: '+e.message,'red');}
+}
+
+// Close db panel when clicking outside
+document.addEventListener('click',e=>{
+  const panel=document.getElementById('db-panel');
+  if(panel&&panel.style.display!=='none'){
+    if(!panel.contains(e.target)&&!e.target.closest('[onclick="toggleDBPanel()"]')){
+      panel.style.display='none';
+    }
+  }
+});
+
+async function checkDB(manual=false){
+  try{
+    const r=await fetch('/api/db_status');
+    const d=await r.json();
+    const dot=document.getElementById('db-dot');
+    const lbl=document.getElementById('db-label');
+    const wrap=dot.parentElement;
+    if(d.connected){
+      dot.className='db-dot on';
+      lbl.textContent='DB Connected';
+      wrap.title='MySQL connected to foamlab_db';
+    } else {
+      dot.className='db-dot';
+      lbl.textContent='DB Offline';
+      const errMsg = d.error||'Check MySQL service and password';
+      wrap.title=errMsg;
+      // Auto-populate error in config panel if open
+      const msg=document.getElementById('db-cfg-msg');
+      if(msg&&document.getElementById('db-panel').style.display!=='none'){
+        _dbCfgMsg('Last error: '+errMsg,'red');
+      }
+    }
+  }catch(e){
+    document.getElementById('db-label').textContent='DB Error';
+  }
+}
+
+// ─── FILE PREVIEW ─────────────────────────────────────────────────────────────
+function onMainFile(){
+  const f=document.getElementById('main-file').files[0];
+  if(!f)return;
+  const url=URL.createObjectURL(f);
+  const prev=document.getElementById('main-preview');
+  const thumb=document.getElementById('main-thumb');
+  const prompt=document.getElementById('main-upload-prompt');
+  prev.onload=()=>URL.revokeObjectURL(url);
+  prev.src=url;
+  thumb.style.display='block';
+  if(prompt) prompt.style.display='none';
+  toast(f.name+' selected','info');
+}
+function onAlgoFile(){
+  const f=document.getElementById('algo-file').files[0];
+  if(f) document.getElementById('algo-file-name').textContent=f.name;
+}
+function onRobFile(){
+  const f=document.getElementById('rob-file').files[0];
+  if(f) document.getElementById('rob-file-name').textContent=f.name;
+}
+function onCmpFile(){
+  const f=document.getElementById('cmp-file').files[0];
+  if(f) document.getElementById('cmp-file-name').textContent=f.name;
+}
+function updateBatchCount(){
+  const n=document.getElementById('batch-files').files.length;
+  document.getElementById('batch-file-count').textContent=n?`${n} file${n>1?'s':''} selected`:'No files selected';
+}
+
+// ─── DRAG SETUP ───────────────────────────────────────────────────────────────
+['main-drop','batch-drop','algo-drop','rob-drop','cmp-drop'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();el.classList.add('drag');});
+  el.addEventListener('dragenter',e=>{e.preventDefault();el.classList.add('drag');});
+  el.addEventListener('dragleave',e=>{if(!el.contains(e.relatedTarget))el.classList.remove('drag');});
+  el.addEventListener('drop',e=>{
+    e.preventDefault();e.stopPropagation();el.classList.remove('drag');
+    const inp=el.querySelector('input[type=file]');
+    if(inp&&e.dataTransfer.files.length){
+      const dt=new DataTransfer();
+      for(const f of e.dataTransfer.files) dt.items.add(f);
+      inp.files=dt.files;
+      inp.dispatchEvent(new Event('change'));
+    }
+  });
+});
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+let _mz=1;
+function openModal(src,title){
+  if(!src)return;
+  document.getElementById('modal-img').src=src;
+  document.getElementById('modal-img').style.transform='scale(1)';
+  document.getElementById('modal-title').textContent=title||'';
+  document.getElementById('img-modal').classList.add('open');
+  _mz=1;
+}
+function closeModal(){document.getElementById('img-modal').classList.remove('open');}
+function openModalByKey(el){
+  const key=el.getAttribute('data-imgkey');
+  const lbl=el.getAttribute('data-imglabel');
+  const src=S.currentImages[key]||'';
+  if(src) openModal(src, lbl);
+}
+function mzoom(d){_mz=Math.max(0.3,Math.min(5,_mz+d));document.getElementById('modal-img').style.transform=`scale(${_mz})`;}
+function mzreset(){_mz=1;document.getElementById('modal-img').style.transform='scale(1)';}
+document.addEventListener('keydown',e=>e.key==='Escape'&&closeModal());
+
+// ─── LABEL HELPERS ────────────────────────────────────────────────────────────
+function labelClass(l){
+  if(!l) return 'label-clean';
+  if(l.includes('Foam'))   return 'label-foam';
+  if(l.includes('Oil'))    return 'label-oil';
+  if(l.includes('Refl'))   return 'label-reflect';
+  if(l.includes('Debris')) return 'label-debris';
+  return 'label-clean';
+}
+function severityBadge(s){
+  const map={Critical:'badge-critical',Moderate:'badge-moderate',Low:'badge-low',Clean:'badge-clean'};
+  return `<span class="badge ${map[s]||'badge-clean'}">${s}</span>`;
+}
+
+// ─── ANALYSE ──────────────────────────────────────────────────────────────────
+async function runAnalyse(){
+  const file=document.getElementById('main-file').files[0];
+  if(!file){toast('Please upload an image','error');return;}
+  const prog=animProg('analyse-prog-fill','analyse-prog',2000);
+  showLoader('Running detection pipeline…');
+  hideAlert('analyse-alert');
+  const fd=new FormData();
+  fd.append('image',file);
+  fd.append('filter_type',S.filter);
+  fd.append('enhance',S.enhance);
+  fd.append('segment',S.seg);
+  fd.append('se_shape',S.se);
+  fd.append('se_size',document.getElementById('se-size').value);
+  fd.append('location',document.getElementById('location-in').value);
+  try{
+    const res=await fetch('/api/analyze',{method:'POST',body:fd});
+    const ct=res.headers.get('content-type')||'';
+    if(!ct.includes('application/json')){
+      const txt=await res.text();
+      prog.done();hideLoader();
+      showAlert('analyse-alert','Server error: '+txt.slice(0,120),'error');
+      toast('Server error','error'); return;
+    }
+    const data=await res.json();
+    prog.done();hideLoader();
+    if(data.error){showAlert('analyse-alert',data.error,'error');toast(data.error,'error');return;}
+    renderResult(data);
+    // save to session
+    S.sessionHistory.unshift({
+      id:'S'+Date.now(), filename:file.name,
+      filter_type:S.filter, enhance:S.enhance, seg_method:S.seg,
+      severity:data.severity, dominant:data.dominant_label,
+      total_regions:data.total_regions, pollution_pct:data.pollution_area_pct,
+      process_time:data.process_time, location:document.getElementById('location-in').value,
+      ts:new Date().toISOString().slice(0,16).replace('T',' '),
+    });
+    toast(`Detection complete — ${data.severity}`);
+  }catch(e){prog.done();hideLoader();showAlert('analyse-alert','Network error: '+e.message,'error');toast('Network error','error');}
+}
+
+function renderResult(data){
+  S.currentImages=data.images||{};
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('result-main').style.display='block';
+  const sev=data.severity||'Clean';
+  const sevEl=document.getElementById('res-severity');
+  sevEl.textContent=sev; sevEl.className='result-severity '+sev;
+  document.getElementById('res-dominant').textContent='Dominant: '+(data.dominant_label||'—');
+  document.getElementById('res-method-badge').innerHTML=severityBadge(sev);
+  document.getElementById('rs-pct').textContent=(data.pollution_area_pct||0)+'%';
+  document.getElementById('rs-regions').textContent=data.total_regions||0;
+  document.getElementById('rs-time').textContent=(data.process_time||0).toFixed(3)+'s';
+
+  // Label distribution chart
+  const lc=data.label_counts||{};
+  const lcKeys=Object.keys(lc); const lcVals=Object.values(lc);
+  const colorMap={'Foam Pollution':'#ff5050','Oil Slick':'#ffa500','Surface Reflection':'#50a0ff','Non-Pollution':'#50c850','Debris / Sediment':'#20c8c8'};
+  // Destroy old chart properly
+  if(S.labelChart){S.labelChart.destroy();S.labelChart=null;}
+  const canvasEl=document.getElementById('label-chart');
+  canvasEl.width=130; canvasEl.height=130;
+  const ctx=canvasEl.getContext('2d');
+  S.labelChart=new Chart(ctx,{
+    type:'doughnut',
+    data:{
+      labels:lcKeys,
+      datasets:[{
+        data:lcVals,
+        backgroundColor:lcKeys.map(k=>colorMap[k]||'#607d8b'),
+        borderWidth:2,
+        borderColor:'#111720',
+        hoverOffset:4
+      }]
+    },
+    options:{
+      responsive:false,
+      maintainAspectRatio:false,
+      cutout:'60%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:ctx=>`${ctx.label}: ${ctx.raw} (${Math.round(ctx.parsed/ctx.dataset.data.reduce((a,b)=>a+b,0)*100)}%)`
+          }
+        }
+      },
+      animation:{duration:500}
+    }
+  });
+  const leg=document.getElementById('label-legend');
+  const total=lcVals.reduce((a,b)=>a+b,0);
+  leg.innerHTML=lcKeys.map(k=>{
+    const pct=total>0?Math.round(lc[k]/total*100):0;
+    return `<div style="display:flex;align-items:center;gap:.4rem;font-size:.7rem;font-family:var(--mono)">
+      <div style="width:10px;height:10px;border-radius:2px;background:${colorMap[k]||'#607d8b'};flex-shrink:0"></div>
+      <span style="color:var(--ink2)">${k}</span>
+      <span style="color:var(--ink);font-weight:600;margin-left:auto">${lc[k]}</span>
+      <span style="color:var(--ink3);font-size:.62rem">(${pct}%)</span>
+    </div>`;
+  }).join('');
+
+  // Visualised
+  document.getElementById('vis-img').src=S.currentImages.visualised||'';
+
+  // Pipeline grid
+  const pipeKeys=[
+    {k:'raw',n:'Raw Input'},{k:'filtered',n:'Filtered'},{k:'enhanced',n:'Enhanced'},
+    {k:'segmented',n:'Segmented'},{k:'eroded',n:'Eroded'},{k:'dilated',n:'Dilated'},
+    {k:'opened',n:'Opened'},{k:'closed',n:'Closed'},{k:'final_mask',n:'Final Mask'},{k:'visualised',n:'Visualised'},
+  ];
+  const grid=document.getElementById('pipe-grid');
+  grid.innerHTML=pipeKeys.map((p,i)=>`
+    <div class="pipe-card" data-imgkey="${p.k}" data-imglabel="${p.n}" onclick="openModalByKey(this)">
+      <img class="pipe-img" src="${S.currentImages[p.k]||''}" alt="${p.n}">
+      <div class="pipe-lbl"><span class="pipe-num">${i+1}</span>${p.n}</div>
+    </div>`).join('');
+
+  // Interactive view tabs
+  const ivKeys=[
+    {k:'raw',l:'Original'},{k:'filtered',l:'Filtered'},{k:'enhanced',l:'Enhanced'},
+    {k:'segmented',l:'Segmented'},{k:'final_mask',l:'Final Mask'},{k:'visualised',l:'Visualised'},
+  ];
+  const ivTabs=document.getElementById('iv-tabs');
+  ivTabs.innerHTML='';
+  ivKeys.forEach((t,i)=>{
+    const btn=document.createElement('button');
+    btn.className='iv-tab'+(i===0?' active':'');
+    btn.textContent=t.l;
+    btn.onclick=()=>{
+      document.querySelectorAll('.iv-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('iv-img').src=S.currentImages[t.k]||'';
+    };
+    ivTabs.appendChild(btn);
+  });
+  document.getElementById('iv-img').src=S.currentImages.raw||'';
+
+  // Region table
+  const tbody=document.getElementById('region-tbody');
+  tbody.innerHTML=(data.regions||[]).map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td><span class="label-pill ${labelClass(r.label)}">${r.label}</span></td>
+      <td>${r.area?.toLocaleString()}</td>
+      <td>${r.perimeter}</td>
+      <td>${r.circularity}</td>
+      <td>${r.compactness}</td>
+      <td>${r.aspect_ratio}</td>
+      <td>${r.solidity}</td>
+      <td>${r.pct_image}%</td>
+    </tr>`).join('');
+}
+
+function clearAnalyse(){
+  document.getElementById('main-file').value='';
+  document.getElementById('main-thumb').style.display='none';
+  document.getElementById('main-upload-prompt').style.display='block';
+  document.getElementById('result-main').style.display='none';
+  document.getElementById('empty-state').style.display='block';
+  hideAlert('analyse-alert');
+  toast('Cleared','info');
+}
+
+// ─── BATCH ────────────────────────────────────────────────────────────────────
+async function runBatch(){
+  const files=document.getElementById('batch-files').files;
+  if(!files.length){toast('Please select images','error');return;}
+  const prog=animProg('batch-prog-fill','batch-prog',files.length*800);
+  showLoader(`Processing ${files.length} images…`);
+  const fd=new FormData();
+  for(const f of files) fd.append('images',f);
+  fd.append('se_size',document.getElementById('batch-se-size').value);
+  try{
+    const res=await fetch('/api/batch_analyze',{method:'POST',body:fd});
+    const ct=res.headers.get('content-type')||'';
+    if(!ct.includes('application/json')){const txt=await res.text();prog.done();hideLoader();toast('Server error: '+txt.slice(0,80),'error');return;}
+    const data=await res.json();
+    prog.done();hideLoader();
+    const s=data.summary||{};
+    const bstats=document.getElementById('batch-stats');
+    bstats.innerHTML=`
+      <div class="stat-box"><div class="stat-val">${s.total_processed||0}</div><div class="stat-lbl">Processed</div></div>
+      <div class="stat-box"><div class="stat-val">${s.total_failed||0}</div><div class="stat-lbl">Failed</div></div>
+      <div class="stat-box"><div class="stat-val">${s.total_images||0}</div><div class="stat-lbl">Total</div></div>`;
+    const list=document.getElementById('batch-list');
+    list.innerHTML=(data.results||[]).map(r=>r.error
+      ?`<div class="cmp-row"><div class="cmp-label" style="color:var(--crit)">${r.filename}</div><div class="cmp-meta">${r.error}</div></div>`
+      :`<div class="cmp-row">
+          <img class="cmp-thumb" src="${r.preview||''}" alt="" onclick="openModal(this.src,'${r.filename}')">
+          <div>
+            <div class="cmp-label">${r.filename}</div>
+            <div class="cmp-meta">Regions: ${r.total_regions} · Poll: ${r.pollution_pct}% · Time: ${r.process_time}s</div>
+          </div>
+          <div class="cmp-stats">${severityBadge(r.severity)}<br><small style="color:var(--ink3);font-family:var(--mono);font-size:.65rem">${r.dominant}</small></div>
+        </div>`).join('');
+    document.getElementById('batch-results').style.display='block';
+    toast(`Batch complete: ${s.total_processed} processed`);
+  }catch(e){prog.done();hideLoader();toast('Batch error: '+e.message,'error');}
+}
+
+// ─── WEBCAM ───────────────────────────────────────────────────────────────────
+let _stream=null;
+async function startWC(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    toast('Camera requires http://localhost:5000','error'); return;
+  }
+  try{
+    _stream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+    document.getElementById('wc-video').srcObject=_stream;
+    document.getElementById('wc-capture').disabled=false;
+    toast('Camera started','info');
+  }catch(e){
+    if(e.name==='NotAllowedError') toast('Camera permission denied','error');
+    else toast('Camera error: '+e.message,'error');
+  }
+}
+function stopWC(){
+  if(_stream){_stream.getTracks().forEach(t=>t.stop());_stream=null;}
+  document.getElementById('wc-capture').disabled=true;
+}
+async function captureWC(){
+  const vid=document.getElementById('wc-video');
+  const can=document.getElementById('wc-canvas');
+  can.width=vid.videoWidth||640; can.height=vid.videoHeight||480;
+  can.getContext('2d').drawImage(vid,0,0);
+  const b64=can.toDataURL('image/jpeg',0.85);
+  showLoader('Analysing frame…');
+  try{
+    const res=await fetch('/api/webcam_analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_b64:b64})});
+    const data=await res.json();
+    hideLoader();
+    if(data.error){toast(data.error,'error');return;}
+    const sev=data.severity||'Clean';
+    const sevEl=document.getElementById('wc-severity');
+    sevEl.textContent=sev; sevEl.className='result-severity '+sev;
+    document.getElementById('wc-dominant').textContent=data.dominant_label||'—';
+    document.getElementById('wc-pct').textContent=(data.pollution_area_pct||0)+'%';
+    document.getElementById('wc-regions').textContent=data.total_regions||0;
+    document.getElementById('wc-vis').src=data.images?.visualised||'';
+    document.getElementById('wc-result').style.display='block';
+    toast('Frame analysed!');
+  }catch(e){hideLoader();toast('Error: '+e.message,'error');}
+}
+
+// ─── ALGORITHM STUDY ─────────────────────────────────────────────────────────
+async function runAlgoStudy(){
+  const file=document.getElementById('algo-file').files[0];
+  if(!file){toast('Please upload an image','error');return;}
+  showLoader('Running 7 pipeline combinations…');
+  const fd=new FormData(); fd.append('image',file);
+  try{
+    const res=await fetch('/api/combination_study',{method:'POST',body:fd});
+    const data=await res.json(); hideLoader();
+    if(data.error){toast(data.error,'error');return;}
+    const combos=data.combos||[];
+    const list=document.getElementById('algo-list');
+    list.innerHTML=combos.map((c,i)=>`
+      <div class="cmp-row">
+        <img class="cmp-thumb" src="${c.preview||''}" alt="" onclick="openModal(this.src,'${c.label}')">
+        <div>
+          <div class="cmp-label">${i+1}. ${c.label}</div>
+          <div class="cmp-meta">Regions: ${c.regions_found} · Pollution: ${c.pollution_pct}% · Time: ${c.process_time}s</div>
+        </div>
+        <div class="cmp-stats">${severityBadge(c.severity)}</div>
+      </div>`).join('');
+    // Find best (most pollution detected = most sensitive)
+    const best=combos.reduce((a,b)=>b.regions_found>a.regions_found?b:a, combos[0]);
+    document.getElementById('algo-best').innerHTML=`
+      <div class="cmp-label">🏆 Best Pipeline: ${best.label}</div>
+      <div class="cmp-meta" style="margin-top:.3rem">Regions: ${best.regions_found} · Pollution: ${best.pollution_pct}% · Severity: ${best.severity}</div>
+      <div class="cmp-meta" style="margin-top:.2rem">Filter: ${best.filter} · Enhancement: ${best.enhance} · Segmentation: ${best.segment}</div>`;
+    document.getElementById('algo-results').style.display='block';
+    toast('Combination study complete!');
+  }catch(e){hideLoader();toast('Error: '+e.message,'error');}
+}
+
+// ─── ROBUSTNESS ───────────────────────────────────────────────────────────────
+async function runRobustness(){
+  const file=document.getElementById('rob-file').files[0];
+  if(!file){toast('Please upload an image','error');return;}
+  showLoader('Testing 7 robustness variants…');
+  const fd=new FormData(); fd.append('image',file);
+  try{
+    const res=await fetch('/api/robustness',{method:'POST',body:fd});
+    const data=await res.json(); hideLoader();
+    if(data.error){toast(data.error,'error');return;}
+    const variants=data.variants||[];
+    // Cards
+    document.getElementById('rob-grid').innerHTML=variants.map(v=>`
+      <div class="rob-card">
+        <img class="rob-thumb" src="${v.preview||''}" alt="${v.label}" onclick="openModal(this.src,'${v.label}')">
+        <div class="rob-body">
+          <div class="rob-name">${v.label}</div>
+          <div class="rob-stat">Regions: ${v.regions_found} · Poll: ${v.pollution_pct}%</div>
+          <div class="rob-stat">Drift: ${v.drift}% · <span class="stability-${v.stability}">${v.stability}</span></div>
+        </div>
+      </div>`).join('');
+    // Table
+    document.getElementById('rob-tbody').innerHTML=variants.map(v=>`
+      <tr>
+        <td>${v.label}</td><td>${v.regions_found}</td>
+        <td>${v.pollution_pct}%</td><td>${severityBadge(v.severity)}</td>
+        <td>${v.drift}%</td>
+        <td class="stability-${v.stability}">${v.stability}</td>
+        <td>${v.process_time}</td>
+      </tr>`).join('');
+    document.getElementById('rob-results').style.display='block';
+    toast('Robustness test complete!');
+  }catch(e){hideLoader();toast('Error: '+e.message,'error');}
+}
+
+// ─── COMPARATIVE ─────────────────────────────────────────────────────────────
+async function runComparative(){
+  const file=document.getElementById('cmp-file').files[0];
+  if(!file){toast('Please upload an image','error');return;}
+  showLoader('Running comparative analysis…');
+  const fd=new FormData(); fd.append('image',file);
+  try{
+    const res=await fetch('/api/comparative',{method:'POST',body:fd});
+    const data=await res.json(); hideLoader();
+    if(data.error){toast(data.error,'error');return;}
+    const systems=data.systems||[];
+    const colors=['#ff5050','#ffa500','#00b4d8'];
+    document.getElementById('cmp-list').innerHTML=systems.map((s,i)=>`
+      <div class="cmp-row" style="border-left:3px solid ${colors[i]}">
+        <img class="cmp-thumb" src="${s.preview||''}" alt="${s.system}" onclick="openModal(this.src,'${s.system}')">
+        <div>
+          <div class="cmp-label">${s.system}</div>
+          <div class="cmp-meta">${s.techniques}</div>
+          <div class="cmp-meta" style="margin-top:.2rem">Regions: ${s.regions} · Pollution: ${s.pollution_pct}% · Robustness: ${s.noise_robust}</div>
+        </div>
+        <div class="cmp-stats">${severityBadge(s.severity||'Clean')}</div>
+      </div>`).join('');
+    // Table
+    document.getElementById('cmp-tbody').innerHTML=systems.map(s=>`
+      <tr>
+        <td>${s.system}</td><td style="max-width:200px">${s.techniques}</td>
+        <td>${s.regions}</td><td>${s.pollution_pct}%</td>
+        <td>${s.noise_robust}</td><td>${s.process_time}s</td>
+      </tr>`).join('');
+    // Chart
+    if(S.cmpChart) S.cmpChart.destroy();
+    const ctx=document.getElementById('cmp-chart').getContext('2d');
+    S.cmpChart=new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels:systems.map(s=>s.system),
+        datasets:[
+          {label:'Pollution %',data:systems.map(s=>s.pollution_pct),backgroundColor:colors,borderRadius:3},
+          {label:'Regions',data:systems.map(s=>s.regions),backgroundColor:colors.map(c=>c+'88'),borderRadius:3},
+        ]
+      },
+      options:{
+        responsive:true,
+        scales:{
+          y:{grid:{color:'#1e2d42'},ticks:{color:'#4a6a8a',font:{family:'IBM Plex Mono'}}},
+          x:{grid:{display:false},ticks:{color:'#8ba4c0',font:{family:'IBM Plex Mono',size:10}}}
+        },
+        plugins:{legend:{labels:{color:'#8ba4c0',font:{family:'IBM Plex Mono',size:10}}}}
+      }
+    });
+    document.getElementById('cmp-results').style.display='block';
+    toast('Comparative analysis complete!');
+  }catch(e){hideLoader();toast('Error: '+e.message,'error');}
+}
+
+// ─── HISTORY ──────────────────────────────────────────────────────────────────
+async function loadHistory(){
+  try{
+    const [hr,tr]=await Promise.all([fetch('/api/history'),fetch('/api/trend_data')]);
+    const hd=await hr.json(); const td=await tr.json();
+    const dbRows=hd.rows||[];
+    const sesRows=S.sessionHistory;
+    const allRows=[...dbRows];
+    sesRows.forEach(sr=>{
+      if(!dbRows.find(r=>r.ts===sr.ts&&r.dominant===sr.dominant)) allRows.push(sr);
+    });
+    S.allHistory=allRows; S.histPage=1;
+    renderHistPage(); updateHistStats();
+    // Trend chart
+    const tdata=(td.data||[]).reverse();
+    if(S.trendChart) S.trendChart.destroy();
+    const ctx=document.getElementById('trend-chart').getContext('2d');
+    S.trendChart=new Chart(ctx,{
+      type:'line',
+      data:{
+        labels:tdata.map(r=>r.d||''),
+        datasets:[{
+          label:'Avg Pollution %',
+          data:tdata.map(r=>r.avg_poll||0),
+          borderColor:'#00b4d8',backgroundColor:'rgba(0,180,216,.08)',
+          tension:.4,fill:true,pointRadius:4,pointBackgroundColor:'#00b4d8'
+        }]
+      },
+      options:{
+        responsive:true,
+        scales:{
+          y:{grid:{color:'#1e2d42'},ticks:{color:'#4a6a8a',font:{family:'IBM Plex Mono'},callback:v=>v+'%'}},
+          x:{grid:{display:false},ticks:{color:'#8ba4c0',font:{family:'IBM Plex Mono',size:9}}}
+        },
+        plugins:{legend:{labels:{color:'#8ba4c0',font:{family:'IBM Plex Mono',size:10}}}}
+      }
+    });
+  }catch(e){}
+}
+
+function updateHistStats(){
+  const rows=S.allHistory;
+  document.getElementById('h-total').textContent=rows.length;
+  if(!rows.length)return;
+  const avgp=rows.reduce((s,r)=>s+(parseFloat(r.pollution_pct)||0),0)/rows.length;
+  document.getElementById('h-avgpoll').textContent=avgp.toFixed(1)+'%';
+  document.getElementById('h-critical').textContent=rows.filter(r=>r.severity==='Critical').length;
+  document.getElementById('h-clean').textContent=rows.filter(r=>r.severity==='Clean').length;
+}
+
+function renderHistPage(){
+  const rows=S.allHistory;
+  const total=rows.length; const pp=S.histPP;
+  const pages=Math.ceil(total/pp);
+  const start=(S.histPage-1)*pp;
+  const slice=rows.slice(start,start+pp);
+  document.getElementById('history-tbody').innerHTML=slice.map(r=>`
+    <tr>
+      <td>${r.id}</td><td>${r.filename||'—'}</td>
+      <td><span style="font-family:var(--mono);font-size:.65rem">${r.filter_type||'—'}</span></td>
+      <td><span style="font-family:var(--mono);font-size:.65rem">${r.enhance||'—'}</span></td>
+      <td><span style="font-family:var(--mono);font-size:.65rem">${r.seg_method||'—'}</span></td>
+      <td>${severityBadge(r.severity||'Clean')}</td>
+      <td><span class="label-pill ${labelClass(r.dominant||'')}">${r.dominant||'—'}</span></td>
+      <td>${r.total_regions||0}</td>
+      <td>${r.pollution_pct||0}%</td>
+      <td>${r.location||'—'}</td>
+      <td style="font-family:var(--mono);font-size:.62rem;color:var(--ink3)">${r.ts||'—'}</td>
+    </tr>`).join('');
+  const pager=document.getElementById('pager');
+  pager.innerHTML='';
+  for(let i=1;i<=pages;i++){
+    const btn=document.createElement('button');
+    btn.textContent=i; btn.className='seg-btn'+(i===S.histPage?' active':'');
+    btn.onclick=()=>{S.histPage=i;renderHistPage();};
+    pager.appendChild(btn);
+  }
+  const info=document.createElement('span');
+  info.style.cssText='font-size:.65rem;font-family:var(--mono);color:var(--ink3);margin-left:.5rem';
+  info.textContent=`${start+1}–${Math.min(start+pp,total)} of ${total}`;
+  pager.appendChild(info);
+}
+
+function exportCSV(){
+  const rows=S.allHistory;
+  if(!rows.length){toast('No data','error');return;}
+  const cols=Object.keys(rows[0]);
+  const csv=[cols.join(','),...rows.map(r=>cols.map(c=>`"${r[c]??''}"`).join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='foamlab_history.csv'; a.click();
+  toast('CSV exported!');
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+// Attach file input listeners via JS (more reliable than inline onchange)
+document.addEventListener('DOMContentLoaded', function(){
+  const inp_main  = document.getElementById('main-file');
+  const inp_batch = document.getElementById('batch-files');
+  const inp_algo  = document.getElementById('algo-file');
+  const inp_rob   = document.getElementById('rob-file');
+  const inp_cmp   = document.getElementById('cmp-file');
+
+  if(inp_main)  inp_main.addEventListener('change',  onMainFile);
+  if(inp_batch) inp_batch.addEventListener('change', updateBatchCount);
+  if(inp_algo)  inp_algo.addEventListener('change',  onAlgoFile);
+  if(inp_rob)   inp_rob.addEventListener('change',   onRobFile);
+  if(inp_cmp)   inp_cmp.addEventListener('change',   onCmpFile);
+
+  checkDB();
+  setInterval(checkDB, 30000);
+});
+</script>
+</body>
+</html>

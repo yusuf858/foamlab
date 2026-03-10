@@ -1,0 +1,6 @@
+flask
+pymysql
+opencv-python-headless
+numpy
+reportlab
+gunicorn
